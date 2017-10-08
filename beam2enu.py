@@ -63,9 +63,9 @@ def parse_sen(filename):
         index = []
         for line in file:
             line = line.split()
-            index.append('{0}-{1}-{2} {3}:{4}:{5}'.format(*line))
+            index.append('{2}-{0}-{1} {3}:{4}:{5}'.format(*line))
             d.append({'Heading':line[12],'Pitch':line[13],'Roll':line[14]})
-    index = pd.to_datetime(index)
+#    index = pd.to_datetime(index)
     rotation = pd.DataFrame(d,index=index,dtype='float')
     rotation.loc[:,'Heading'] = rotation.loc[:,'Heading']-90
     rotation = np.radians(rotation)
@@ -116,7 +116,7 @@ for sc,rc in zip(source_cells,result_cells):
     for source,R in zip(source_vel.loc[:,idx[:,sc]].values,Rs):
         cell_vel.append(np.dot(R,source))
     result_vel.loc[:,idx[:,rc]] = np.array(cell_vel)
-result_filename = filename+'_enu' if beam2enu else filename+'_beam'
+result_filename = '/tmp/'+filename+'_enu' if beam2enu else filename+'_beam'
 if to_separate_files:
     fmt = [':d',':d']+['%.5f' for i in range(len(beam_cells))]
     for comp in comps:
