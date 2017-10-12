@@ -20,6 +20,8 @@ def parse_aquadopp_hdr(filename,read_transformation_matrix=False):
                 continue
             elif line is '\n':
                 continue
+            elif line.startswith('Coordinate system'):
+                beam2enu = True if line.split()[-1] == 'BEAM' else False
             elif line.startswith('Orientation'):
                 if line.split()[-1] == 'DOWNLOOKING':
                     downlooking = True
@@ -85,7 +87,6 @@ def get_nortek_velocity_df(filename,columns,index):
     return vel
 to_separate_files = True
 idx = pd.IndexSlice
-beam2enu = True
 comps = ['v1','v2','v3']
 filename = ''
 if not filename:
