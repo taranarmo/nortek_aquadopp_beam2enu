@@ -42,6 +42,7 @@ def parse_aquadopp_hdr(filename,read_transformation_matrix=False):
     return_list = [beam_cells, vert_cells, downlooking]
     if read_transformation_matrix:
         return_list.append(T)
+    return_list.append(beam2enu)
     return return_list
 
 def parse_T(T):
@@ -59,15 +60,18 @@ def get_result_matrix(hh,pp,rr,T):
                   [np.sin(pp),np.sin(rr)*np.cos(pp),np.cos(pp)*np.cos(rr)]])
     return np.array(H*P*T)
 
-def parse_sen(filename):
+def parse_sen(filename,build_index=False):
     with open(filename+'.sen','r',encoding='windows-1251') as file:
         d = []
         index = []
         for line in file:
             line = line.split()
-            index.append('{2}-{0}-{1} {3}:{4}:{5}'.format(*line))
+            if build_index:
+                index.append('{2}-{0}-{1} {3}:{4}:{5}'.format(*line))
             d.append({'Heading':line[12],'Pitch':line[13],'Roll':line[14]})
 #    index = pd.to_datetime(index)
+    if not build_index:
+        index = np.loadtxt('index_file',dtype=np.datetime64,delimiter='\t')
     rotation = pd.DataFrame(d,index=index,dtype='float')
     rotation.loc[:,'Heading'] = rotation.loc[:,'Heading']-90
     rotation = np.radians(rotation)
@@ -85,6 +89,7 @@ def get_nortek_velocity_df(filename,columns,index):
         vel.loc[:,comp] = df.values
     vel.index = df.index
     return vel
+
 to_separate_files = True
 idx = pd.IndexSlice
 comps = ['v1','v2','v3']
@@ -93,9 +98,9 @@ if not filename:
     filename = sys.argv[1]
 T = ''''''
 if T:
-    beam_cells,vert_cells,downlooking = parse_aquadopp_hdr(filename)
+    beam_cells, vert_cells, downlooking, beam2enu = parse_aquadopp_hdr(filename)
 else:
-    beam_cells,vert_cells,downlooking,T = parse_aquadopp_hdr(filename,read_transformation_matrix=True)
+    beam_cells, vert_cells, downlooking, T, beam2enu = parse_aquadopp_hdr(filename,read_transformation_matrix=True)
 T = parse_T(T)
 if downlooking:
     T[1] = -T[1]
