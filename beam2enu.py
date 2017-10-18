@@ -122,7 +122,7 @@ for sc,rc in zip(source_cells,result_cells):
     for source,R in zip(source_vel.loc[:,idx[:,sc]].values,Rs):
         cell_vel.append(np.dot(R,source))
     result_vel.loc[:,idx[:,rc]] = np.array(cell_vel)
-result_filename = '/tmp/'+filename+'_enu' if beam2enu else filename+'_beam'
+result_filename = filename+'_enu' if beam2enu else filename+'_beam'
 if to_separate_files:
     fmt = [':d',':d']+['%.5f' for i in range(len(beam_cells))]
     for comp in comps:
