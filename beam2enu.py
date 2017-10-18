@@ -71,7 +71,7 @@ def parse_sen(filename,build_index=False):
             d.append({'Heading':line[12],'Pitch':line[13],'Roll':line[14]})
 #    index = pd.to_datetime(index)
     if not build_index:
-        index = np.loadtxt('index_file',dtype=np.datetime64,delimiter='\t')
+        index = np.loadtxt(filename+'_index_file',dtype=np.datetime64,delimiter='\t')
     rotation = pd.DataFrame(d,index=index,dtype='float')
     rotation.loc[:,'Heading'] = rotation.loc[:,'Heading']-90
     rotation = np.radians(rotation)
