@@ -108,18 +108,21 @@ if downlooking:
 source_cells = beam_cells if beam2enu else vert_cells
 result_cells = vert_cells if beam2enu else beam_cells
 columns = ['burst', 'ping', *source_cells, 'TS']
+print('reading {}.sen file'.format(filename))
 rotation = parse_sen(filename)
+print('reading velocity data')
 source_vel = get_nortek_velocity_df(filename,columns,rotation.index)
 columns = pd.MultiIndex.from_product([['v1', 'v2', 'v3'], result_cells],names=['Component', 'Cell'])
 result_vel = pd.DataFrame(index=source_vel.index,columns=columns)
+print('building result matrix')
 Rs = []
 for ts in rotation.index:
     Rs.append(get_result_matrix(*rotation.loc[ts].values,T))
 if not beam2enu:
     Rs = np.linalg.inv(Rs)
 for sc,rc in zip(source_cells,result_cells):
-    cell_vel = []
     result_vel.loc[:,idx[:,rc]] = np.einsum('ijk,ik->ij', Rs, source_vel.loc[:,idx[:,sc]].values)
+print('saving')
 result_filename = filename+'_enu' if beam2enu else filename+'_beam'
 if to_separate_files:
     fmt = [':d',':d']+['%.5f' for i in range(len(beam_cells))]
