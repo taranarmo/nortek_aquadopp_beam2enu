@@ -128,6 +128,7 @@ if to_separate_files:
     fmt = [':d',':d']+['%.5f' for i in range(len(beam_cells))]
     for comp in comps:
         output_df = result_vel.loc[:,idx[comp,:]]
+        output_df.columns = output_df.columns.levels[-1]
         out_filename = '{}.{}.csv'.format(result_filename,comp)
         output_df.to_csv(out_filename,encoding='ascii',float_format='%.5f')
 else:
