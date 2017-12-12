@@ -90,6 +90,18 @@ def get_nortek_velocity_df(filename,columns,index):
     vel.index = df.index
     return vel
 
+def save_file(df, to_separate_files, result_filename):
+    if to_separate_files:
+        fmt = [':d',':d']+['%.5f' for i in range(len(beam_cells))]
+        for comp in comps:
+            output_df = df.loc[:,idx[comp,:]]
+            output_df.columns = output_df.columns.levels[-1]
+            out_filename = '{}.{}.csv'.format(result_filename,comp)
+            output_df.to_csv(out_filename,encoding='ascii',float_format='%.5f')
+    else:
+        df.to_csv(result_filename+'.csv',encoding='ascii',float_format='%.5f')
+
+save_in_original_coords = True
 to_separate_files = True
 idx = pd.IndexSlice
 comps = ['v1','v2','v3']
@@ -124,13 +136,9 @@ for sc,rc in zip(source_cells,result_cells):
     result_vel.loc[:,idx[:,rc]] = np.einsum('ijk,ik->ij', Rs, source_vel.loc[:,idx[:,sc]].values)
 print('saving')
 result_filename = filename+'_enu' if beam2enu else filename+'_beam'
-if to_separate_files:
-    fmt = [':d',':d']+['%.5f' for i in range(len(beam_cells))]
-    for comp in comps:
-        output_df = result_vel.loc[:,idx[comp,:]]
-        output_df.columns = output_df.columns.levels[-1]
-        out_filename = '{}.{}.csv'.format(result_filename,comp)
-        output_df.to_csv(out_filename,encoding='ascii',float_format='%.5f')
-else:
-    result_vel.to_csv(result_filename+'.csv',encoding='ascii',float_format='%.5f')
-
+result_filename_source = filename+'_beam' if beam2enu else filename+'_enu'
+if save_in_original_coords:
+    print('saving in original coordinates')
+    save_file(source_vel, to_separate_files=to_separate_files, result_filename=result_filename_source)
+print('saving in new coordinates')
+save_file(result_vel, to_separate_files=to_separate_files, result_filename=result_filename)
