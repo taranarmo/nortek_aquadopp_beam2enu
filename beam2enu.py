@@ -68,21 +68,32 @@ def parse_sen(filename,build_index=False):
             line = line.split()
             if build_index:
                 index.append('{2}-{0}-{1} {3}:{4}:{5}'.format(*line))
-            d.append({'Heading':line[12],'Pitch':line[13],'Roll':line[14]})
+            d.append({'Heading':line[12],
+                      'Pitch':line[13],
+                      'Roll':line[14]})
 #    index = pd.to_datetime(index)
     if not build_index:
-        index = np.loadtxt(filename+'_index_file',dtype=np.datetime64,delimiter='\t')
-    rotation = pd.DataFrame(d,index=index,dtype='float')
+        index = np.loadtxt(filename+'_index_file',
+                           dtype=np.datetime64,
+                           delimiter='\t')
+    rotation = pd.DataFrame(d,
+                            index=index,
+                            dtype='float32')
     rotation.loc[:,'Heading'] = rotation.loc[:,'Heading']-90
     rotation = np.radians(rotation)
     return rotation
 
 def get_nortek_velocity_df(filename,columns,index):
     cells = beam_cells if beam2enu else vert_cells
-    multi_cols = pd.MultiIndex.from_product([['v1','v2','v3'],cells],names=['Component','Cell'])
-    vel = pd.DataFrame(columns=multi_cols)
+    multi_cols = pd.MultiIndex.from_product([['v1','v2','v3'],cells],
+                                            names=['Component','Cell'])
+    vel = pd.DataFrame(columns=multi_cols,
+                       dtype='float32')
     for comp in ['v1','v2','v3']:
-        df = pd.read_table(filename+'.'+comp,delim_whitespace=True,header=None)
+        df = pd.read_table(filename+'.'+comp,
+                           delim_whitespace=True,
+                           header=None,
+                           )
         df['TS'] = index
         df.columns = columns
         df.set_index(['TS','burst','ping'],inplace=True)
@@ -124,8 +135,11 @@ print('reading {}.sen file'.format(filename))
 rotation = parse_sen(filename)
 print('reading velocity data')
 source_vel = get_nortek_velocity_df(filename,columns,rotation.index)
-columns = pd.MultiIndex.from_product([['v1', 'v2', 'v3'], result_cells],names=['Component', 'Cell'])
-result_vel = pd.DataFrame(index=source_vel.index,columns=columns)
+columns = pd.MultiIndex.from_product([['v1', 'v2', 'v3'],result_cells],
+                                     names=['Component', 'Cell'])
+result_vel = pd.DataFrame(index=source_vel.index,
+                          columns=columns,
+                          dtype='float32')
 print('building result matrix')
 Rs = []
 for ts in rotation.index:
