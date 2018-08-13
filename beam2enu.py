@@ -2,9 +2,11 @@
 
 import numpy as np
 import pandas as pd
+import fnmatch
+import os
 import sys
 
-def parse_aquadopp_hdr(filename,read_transformation_matrix=False):  
+def parse_aquadopp_hdr(filename,read_transformation_matrix=False):
     with open(filename+'.hdr','r',encoding='windows-1251') as f:
         if read_transformation_matrix:
             T = []
@@ -54,10 +56,12 @@ def parse_T(T):
     return np.matrix(T)
 
 def get_result_matrix(hh,pp,rr,T):
-    H = np.matrix([[np.cos(hh),np.sin(hh),0],[-np.sin(hh),np.cos(hh),0],[0,0,1]])
+    H = np.matrix([[np.cos(hh),np.sin(hh),0],
+                   [-np.sin(hh),np.cos(hh),0],
+                   [0,0,1]])
     P = np.matrix([[np.cos(pp),-np.sin(pp)*np.sin(rr),-np.cos(rr)*np.sin(pp)],
-                  [0,np.cos(rr),-np.sin(rr)],
-                  [np.sin(pp),np.sin(rr)*np.cos(pp),np.cos(pp)*np.cos(rr)]])
+                   [0,np.cos(rr),-np.sin(rr)],
+                   [np.sin(pp),np.sin(rr)*np.cos(pp),np.cos(pp)*np.cos(rr)]])
     return np.array(H*P*T)
 
 def parse_sen(filename,build_index=False):
@@ -83,7 +87,12 @@ def parse_sen(filename,build_index=False):
     rotation = np.radians(rotation)
     return rotation
 
-def get_nortek_velocity_df(filename,columns,index):
+def get_nortek_velocity_df(filename,
+                           columns,
+                           index,
+                           beam2enu,
+                           vert_cells,
+                           beam_cells):
     cells = beam_cells if beam2enu else vert_cells
     multi_cols = pd.MultiIndex.from_product([['v1','v2','v3'],cells],
                                             names=['Component','Cell'])
@@ -101,58 +110,115 @@ def get_nortek_velocity_df(filename,columns,index):
     vel.index = df.index
     return vel
 
-def save_file(df, to_separate_files, result_filename):
+def save_file(df, to_separate_files, result_filename, beam2enu, cells):
+    idx = pd.IndexSlice
     if to_separate_files:
-        fmt = [':d',':d']+['%.5f' for i in range(len(beam_cells))]
-        for comp in comps:
+        fmt = [':d',':d']+['%.5f' for i in range(len(cells))]
+        for comp in ['v1','v2','v3']:
             output_df = df.loc[:,idx[comp,:]]
             output_df.columns = output_df.columns.levels[-1]
             out_filename = '{}.{}.csv'.format(result_filename,comp)
-            output_df.to_csv(out_filename,encoding='ascii',float_format='%.5f')
+            output_df.to_csv(out_filename,
+                             encoding='ascii',
+                             float_format='%.5f')
     else:
         df.to_csv(result_filename+'.csv',encoding='ascii',float_format='%.5f')
 
-save_in_original_coords = True
-to_separate_files = True
-idx = pd.IndexSlice
-comps = ['v1','v2','v3']
-filename = ''
-if not filename:
-    filename = sys.argv[1]
-T = ''''''
-if T:
-    beam_cells, vert_cells, downlooking, beam2enu = parse_aquadopp_hdr(filename)
-else:
-    beam_cells, vert_cells, downlooking, T, beam2enu = parse_aquadopp_hdr(filename,read_transformation_matrix=True)
-T = parse_T(T)
-if downlooking:
-    T[1] = -T[1]
-    T[2] = -T[2]
-source_cells = beam_cells if beam2enu else vert_cells
-result_cells = vert_cells if beam2enu else beam_cells
-columns = ['burst', 'ping', *source_cells, 'TS']
-print('reading {}.sen file'.format(filename))
-rotation = parse_sen(filename)
-print('reading velocity data')
-source_vel = get_nortek_velocity_df(filename,columns,rotation.index)
-columns = pd.MultiIndex.from_product([['v1', 'v2', 'v3'],result_cells],
-                                     names=['Component', 'Cell'])
-result_vel = pd.DataFrame(index=source_vel.index,
-                          columns=columns,
-                          dtype='float32')
-print('building result matrix')
-Rs = []
-for ts in rotation.index:
-    Rs.append(get_result_matrix(*rotation.loc[ts].values,T))
-if not beam2enu:
-    Rs = np.linalg.inv(Rs)
-for sc,rc in zip(source_cells,result_cells):
-    result_vel.loc[:,idx[:,rc]] = np.einsum('ijk,ik->ij', Rs, source_vel.loc[:,idx[:,sc]].values)
-print('saving')
-result_filename = filename+'_enu' if beam2enu else filename+'_beam'
-result_filename_source = filename+'_beam' if beam2enu else filename+'_enu'
-if save_in_original_coords:
-    print('saving in original coordinates')
-    save_file(source_vel, to_separate_files=to_separate_files, result_filename=result_filename_source)
-print('saving in new coordinates')
-save_file(result_vel, to_separate_files=to_separate_files, result_filename=result_filename)
+def parse_sen(filename):
+    names = 'Month, Day, Year, Hour, Minute, Second, Burst counter, Ensemble counter, Error code, Status code, Battery voltage, Soundspeed, Heading, Pitch, Roll, Pressure, Temperature, Analog input 1, Analog input 2'.split(', ')
+    sen = pd.read_table(f'{filename}.sen', names=names, delim_whitespace=True)
+    index_cols = ['Year', 'Month', 'Day', 'Hour', 'Minute', 'Second']
+    index_formatter = lambda x: '{0:02.0f}-{1:02.0f}-{2:02.0f} {3:02.0f}:{4:02.0f}:{5:02.4f}'.format(*x)
+    index = sen.loc[:, index_cols].apply(index_formatter,
+                                         axis=1)
+    index = index.astype(np.datetime64)
+    index = index.values
+    rotation = sen.loc[:,['Heading','Pitch','Roll']]
+    rotation.loc[:,'Heading'] = rotation.loc[:,'Heading']-90
+    rotation = np.radians(rotation)
+    rotation = rotation.astype('float32')
+    rotation.index = index
+    return rotation, index
+
+def convert_data_coordinates(filename,
+                             save_in_original_coords = True,
+                             to_separate_files = True,
+                             T = ''):
+    idx = pd.IndexSlice
+    comps = ['v1','v2','v3']
+    if T:
+        [beam_cells,
+         vert_cells,
+         downlooking,
+         beam2enu] = parse_aquadopp_hdr(filename)
+    else:
+        [beam_cells,
+         vert_cells,
+         downlooking,
+         T,
+         beam2enu] = parse_aquadopp_hdr(filename,
+                                        read_transformation_matrix=True)
+    T = parse_T(T)
+    if downlooking:
+        T[1] = -T[1]
+        T[2] = -T[2]
+    source_cells = beam_cells if beam2enu else vert_cells
+    result_cells = vert_cells if beam2enu else beam_cells
+    columns = ['burst', 'ping', *source_cells, 'TS']
+    print('reading {}.sen file'.format(filename))
+    rotation, index = parse_sen(filename)
+    print('reading velocity data')
+    source_vel = get_nortek_velocity_df(filename=filename,
+                                        columns=columns,
+                                        index=index,
+                                        beam2enu=beam2enu,
+                                        vert_cells=vert_cells,
+                                        beam_cells=beam_cells)
+    columns = pd.MultiIndex.from_product([['v1', 'v2', 'v3'],result_cells],
+                                        names=['Component', 'Cell'])
+    result_vel = pd.DataFrame(index=source_vel.index,
+                              columns=columns,
+                              dtype='float32')
+    print('building result matrix')
+    Rs = []
+    for ts in rotation.index:
+        Rs.append(get_result_matrix(*rotation.loc[ts].values,T))
+    if not beam2enu:
+        Rs = np.linalg.inv(Rs)
+    for sc,rc in zip(source_cells,result_cells):
+        result_vel.loc[:,idx[:,rc]] = np.einsum('ijk,ik->ij',
+                                                Rs,
+                                                source_vel.loc[:,idx[:,sc]].values)
+    print('saving')
+    result_filename = filename+'_enu' if beam2enu else filename+'_beam'
+    result_filename_source = filename+'_beam' if beam2enu else filename+'_enu'
+    if save_in_original_coords:
+        print('saving in original coordinates')
+        save_file(source_vel,
+                  to_separate_files=to_separate_files,
+                  result_filename=result_filename_source,
+                  beam2enu=beam2enu,
+                  cells=source_cells)
+    print('saving in new coordinates')
+    save_file(result_vel, 
+              to_separate_files=to_separate_files,
+              result_filename=result_filename,
+              beam2enu=beam2enu,
+              cells=result_cells)
+
+
+def main(filename=None):
+    if not filename:
+        hdr_file = fnmatch.filter(names=os.listdir(), pat='*.hdr')
+        hdr_file = hdr_file[0]
+        filename = hdr_file.split('.')[0]
+    if f'{filename}_beam.v1.csv' not in os.listdir():
+        convert_data_coordinates(filename)
+
+if __name__ == '__main__':
+    try:
+        main(sys.argv[1])
+    except:
+        print('Script runs without argument')
+        print('Assumed one deployment per directory')
+        main()
