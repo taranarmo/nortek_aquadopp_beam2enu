@@ -212,6 +212,7 @@ def main(filename=None):
         hdr_file = fnmatch.filter(names=os.listdir(), pat='*.hdr')
         hdr_file = hdr_file[0]
         filename = hdr_file.split('.')[0]
+        print(f'Found file {filename}')
     if f'{filename}_beam.v1.csv' not in os.listdir():
         convert_data_coordinates(filename)
 
