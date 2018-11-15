@@ -6,15 +6,15 @@ import fnmatch
 import os
 import sys
 
-def parse_aquadopp_hdr(filename,read_transformation_matrix=False):
-    with open(filename+'.hdr','r',encoding='windows-1251') as f:
+def parse_aquadopp_hdr(filename, read_transformation_matrix=False):
+    with open(filename+'.hdr', 'r', encoding='windows-1251') as f:
         if read_transformation_matrix:
-            T = []
+            T = [] # if the transformation matrix is not set, then read
         beam_cells = []
         vert_cells = []
         read_cells = False
         lines = f.readlines()
-        for i,line in enumerate(lines):
+        for i, line in enumerate(lines):
             if read_cells and line is '\n':
                 read_cells = False
                 continue
@@ -48,24 +48,24 @@ def parse_aquadopp_hdr(filename,read_transformation_matrix=False):
     return return_list
 
 def parse_T(T):
-    if isinstance(T,list):
+    if isinstance(T, list):
         T = [s.strip('Transformation matrix').strip() for s in T]
     else:
         T = T.strip().split('\n')
     T = '{};\n{};\n{}'.format(*T)
     return np.matrix(T)
 
-def get_result_matrix(hh,pp,rr,T):
-    H = np.matrix([[np.cos(hh),np.sin(hh),0],
-                   [-np.sin(hh),np.cos(hh),0],
-                   [0,0,1]])
-    P = np.matrix([[np.cos(pp),-np.sin(pp)*np.sin(rr),-np.cos(rr)*np.sin(pp)],
-                   [0,np.cos(rr),-np.sin(rr)],
-                   [np.sin(pp),np.sin(rr)*np.cos(pp),np.cos(pp)*np.cos(rr)]])
+def get_result_matrix(hh, pp, rr, T):
+    H = np.matrix([[np.cos(hh), np.sin(hh), 0],
+                   [-np.sin(hh), np.cos(hh), 0],
+                   [0, 0, 1]])
+    P = np.matrix([[np.cos(pp), -np.sin(pp)*np.sin(rr), -np.cos(rr)*np.sin(pp)],
+                   [0, np.cos(rr), -np.sin(rr)],
+                   [np.sin(pp), np.sin(rr)*np.cos(pp), np.cos(pp)*np.cos(rr)]])
     return np.array(H*P*T)
 
-def parse_sen(filename,build_index=False):
-    with open(filename+'.sen','r',encoding='windows-1251') as file:
+def parse_sen(filename, build_index=False):
+    with open(filename+'.sen', 'r', encoding='windows-1251') as file:
         d = []
         index = []
         for line in file:
@@ -83,7 +83,7 @@ def parse_sen(filename,build_index=False):
     rotation = pd.DataFrame(d,
                             index=index,
                             dtype='float32')
-    rotation.loc[:,'Heading'] = rotation.loc[:,'Heading']-90
+    rotation.loc[:, 'Heading'] = rotation.loc[:, 'Heading']-90
     rotation = np.radians(rotation)
     return rotation
 
@@ -94,35 +94,35 @@ def get_nortek_velocity_df(filename,
                            vert_cells,
                            beam_cells):
     cells = beam_cells if beam2enu else vert_cells
-    multi_cols = pd.MultiIndex.from_product([['v1','v2','v3'],cells],
-                                            names=['Component','Cell'])
+    multi_cols = pd.MultiIndex.from_product([['v1', 'v2', 'v3'], cells],
+                                            names=['Component', 'Cell'])
     vel = pd.DataFrame(columns=multi_cols,
                        dtype='float32')
-    for comp in ['v1','v2','v3']:
+    for comp in ['v1', 'v2', 'v3']:
         df = pd.read_table(filename+'.'+comp,
                            delim_whitespace=True,
                            header=None,
                            )
         df['TS'] = index
         df.columns = columns
-        df.set_index(['TS','burst','ping'],inplace=True)
-        vel.loc[:,comp] = df.values
+        df.set_index(['TS', 'burst', 'ping'], inplace=True)
+        vel.loc[:, comp] = df.values
     vel.index = df.index
     return vel
 
 def save_file(df, to_separate_files, result_filename, beam2enu, cells):
     idx = pd.IndexSlice
     if to_separate_files:
-        fmt = [':d',':d']+['%.5f' for i in range(len(cells))]
-        for comp in ['v1','v2','v3']:
-            output_df = df.loc[:,idx[comp,:]]
+        fmt = [':d', ':d']+['%.5f' for i in range(len(cells))]
+        for comp in ['v1', 'v2', 'v3']:
+            output_df = df.loc[:, idx[comp, :]]
             output_df.columns = output_df.columns.levels[-1]
-            out_filename = '{}.{}.csv'.format(result_filename,comp)
+            out_filename = '{}.{}.csv'.format(result_filename, comp)
             output_df.to_csv(out_filename,
                              encoding='ascii',
                              float_format='%.5f')
     else:
-        df.to_csv(result_filename+'.csv',encoding='ascii',float_format='%.5f')
+        df.to_csv(result_filename+'.csv', encoding='ascii', float_format='%.5f')
 
 def parse_sen(filename):
     names = 'Month, Day, Year, Hour, Minute, Second, Burst counter, Ensemble counter, Error code, Status code, Battery voltage, Soundspeed, Heading, Pitch, Roll, Pressure, Temperature, Analog input 1, Analog input 2'.split(', ')
@@ -133,8 +133,8 @@ def parse_sen(filename):
                                          axis=1)
     index = index.astype(np.datetime64)
     index = index.values
-    rotation = sen.loc[:,['Heading','Pitch','Roll']]
-    rotation.loc[:,'Heading'] = rotation.loc[:,'Heading']-90
+    rotation = sen.loc[:, ['Heading', 'Pitch', 'Roll']]
+    rotation.loc[:, 'Heading'] = rotation.loc[:, 'Heading']-90
     rotation = np.radians(rotation)
     rotation = rotation.astype('float32')
     rotation.index = index
@@ -145,7 +145,7 @@ def convert_data_coordinates(filename,
                              to_separate_files = True,
                              T = ''):
     idx = pd.IndexSlice
-    comps = ['v1','v2','v3']
+    comps = ['v1', 'v2', 'v3']
     if T:
         [beam_cells,
          vert_cells,
@@ -174,7 +174,7 @@ def convert_data_coordinates(filename,
                                         beam2enu=beam2enu,
                                         vert_cells=vert_cells,
                                         beam_cells=beam_cells)
-    columns = pd.MultiIndex.from_product([['v1', 'v2', 'v3'],result_cells],
+    columns = pd.MultiIndex.from_product([['v1', 'v2', 'v3'], result_cells],
                                         names=['Component', 'Cell'])
     result_vel = pd.DataFrame(index=source_vel.index,
                               columns=columns,
@@ -182,13 +182,13 @@ def convert_data_coordinates(filename,
     print('building result matrix')
     Rs = []
     for ts in rotation.index:
-        Rs.append(get_result_matrix(*rotation.loc[ts].values,T))
+        Rs.append(get_result_matrix(*rotation.loc[ts].values, T))
     if not beam2enu:
         Rs = np.linalg.inv(Rs)
-    for sc,rc in zip(source_cells,result_cells):
-        result_vel.loc[:,idx[:,rc]] = np.einsum('ijk,ik->ij',
+    for sc, rc in zip(source_cells, result_cells):
+        result_vel.loc[:, idx[:, rc]] = np.einsum('ijk, ik->ij',
                                                 Rs,
-                                                source_vel.loc[:,idx[:,sc]].values)
+                                                source_vel.loc[:, idx[:, sc]].values)
     print('saving')
     result_filename = filename+'_enu' if beam2enu else filename+'_beam'
     result_filename_source = filename+'_beam' if beam2enu else filename+'_enu'
