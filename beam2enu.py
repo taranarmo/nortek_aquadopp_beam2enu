@@ -247,13 +247,19 @@ def convert_data_coordinates(filename,
               beam2enu=beam2enu,
               cells=result_cells)
 
+def guess_filename(working_dir=None):
+    if not working_dir:
+        working_dir = '.'
+    hdr_file = fnmatch.filter(names=os.listdir(working_dir), pat="*.hdr")
+    hdr_file = hdr_file[0]
+    filename = hdr_file.split('.')[0]
+    print(f"Found file {filename}")
+    return filename
+
 
 def main(filename=None):
     if not filename:
-        hdr_file = fnmatch.filter(names=os.listdir(), pat="*.hdr")
-        hdr_file = hdr_file[0]
-        filename = hdr_file.split('.')[0]
-        print(f"Found file {filename}")
+        filename = guess_filename()
     if f"{filename}_beam.v1.csv" not in os.listdir():
         convert_data_coordinates(filename)
 
