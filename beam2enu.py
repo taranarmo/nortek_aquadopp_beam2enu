@@ -113,10 +113,11 @@ def get_nortek_velocity_df(filename, columns, index,
             dtype="float32",
             )
     for comp in ["v1", "v2", "v3"]:
-        df = pd.read_table(
+        df = pd.read_csv(
                 f"{filename}.{comp}",
                 delim_whitespace=True,
                 header=None,
+                sep='\t',
                 )
         df["TS"] = index
         df.columns = columns
